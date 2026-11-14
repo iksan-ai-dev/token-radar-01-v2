@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Token Launch Radar — pre-token protocols ranked by implied launch value</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dot"></span>TOKEN LAUNCH RADAR</div>
+  <h1>Which pre-token protocol is worth farming next?</h1>
+  <p class="sub">758 protocols scanned from the DefiLlama snapshot of <b id="asOf">—</b>. Every protocol below <b>records no token</b> — that is what DefiLlama's record says, not proof it has none — and none is a wrapped, staked or bridged product of a token that already trades. Implied values are this entry's model, not a prediction that a token will launch.</p>
+  <div class="stats" id="stats"></div>
+  <div class="badge" id="badge">page = board.json: checking…</div>
+</header>
+
+<section class="filters" id="filters">
+  <input id="q" type="search" placeholder="Search name or slug…" aria-label="Search">
+  <select id="cat" aria-label="Category"><option value="">All categories</option></select>
+  <select id="chain" aria-label="Chain"><option value="">All chains</option></select>
+  <label class="wl"><input id="wl" type="checkbox"> Watchlist only</label>
+  <select id="sort" aria-label="Sort">
+    <option value="v">Sort: implied value ↓</option>
+    <option value="t">Sort: TVL ↓</option>
+    <option value="s">Sort: slice / $1K ↓</option>
+    <option value="g">Sort: 7d growth ↓</option>
+    <option value="a">Sort: age ↓</option>
+  </select>
+  <span id="count"></span>
+</section>
+
+<main>
+  <table id="board">
+    <thead><tr>
+      <th data-k="rank">#</th><th data-k="name">Protocol</th><th data-k="cat">Category</th>
+      <th data-k="chain">Farm on</th><th data-k="tvl">TVL</th><th data-k="chg">7d</th>
+      <th data-k="age">Age</th><th data-k="v">Implied value</th><th data-k="mult">Multiple</th>
+      <th data-k="slice">Slice / $1K</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p class="hint">Click a row for the full farm plan, the value breakdown, the P25–P75 range and the nearest comparables. Slice / $1K assumes depositors get 10% of the implied value pro rata.</p>
+</main>
+
+<section id="detail"></section>
+
+<section class="panel" id="method">
+  <h2>Methodology — the value model, in full</h2>
+  <p><b>Fitted size curve, not a flat median.</b> The snapshot's own <span id="mN">128</span> tokened comparables show that market-cap-per-TVL falls as protocols get bigger. We fit, at runtime, log<sub>10</sub>(mcap/TVL) = <b id="mEq">a + b·log<sub>10</sub>(TVL)</b> — elasticity <b id="mB">−0.48</b>, so the multiple is about <b id="mSmall">0.48×</b> at $10M TVL and <b id="mBig">0.033×</b> at $2.76B TVL. A flat category median would overvalue the largest protocols roughly 3×; the curve is what the snapshot's own numbers say.</p>
+  <p><b>Category adjustment.</b> Each category's median residual from the curve is shrunk toward zero by n/(n+4) (4 pseudo-comparables) and applied as a multiplier. Categories with no comparables get no adjustment.</p>
+  <p><b>Multipliers.</b> Implied value = TVL × curve multiple × category adjustment × growth × age × breadth. Growth = 1 + 0.5·clamp(change_7d/25, −1, 1). Age: under 6 months 0.85, 6–12 months 0.95, 1–4 years rising 1.00→1.15, then fading to 0.85 — mature pre-token protocols are the most credible launches. Breadth = 1 + 0.08·ln(chains), capped 1.25. Capped at $10B, rounded to whole dollars.</p>
+  <p><b>No quality discount.</b> We do <i>not</i> discount Risk Curators or Onchain Capital Allocators by 0.5: the size curve already penalises the giants, and the comparables rank the big curators at the top without a discount — an extra 0.5 would double-count and diverge from the data.</p>
+  <p><b>Uncertainty.</b> Residual SD is <b id="mSd">—</b> in log<sub>10</sub>, so each value carries a P25–P75 range of implied ÷ <b id="mRk">—</b> to implied × <b id="mRk2">—</b>.</p>
+  <p><b>Validation (leave-one-out).</b> Refit the curve 128 times, each time holding one comparable out: median prediction error <b id="mLoo">—</b>. A flat-median baseline on the same test errs by <b id="mFlat">—</b>. The size curve beats the naive model — that is the point.</p>
+  <p><b>What the model gets wrong.</b> The comparable with the largest leave-one-out residual is <b id="mWorst">—</b> (residual <span id="mWorstR">—</span> in log<sub>10</sub>): tiny, volatile tokens can trade at multiples hundreds of times the curve. The model is a median story, not a promise for any one name.</p>
+  <p><b>What we do not claim.</b> mcap here is circulating market cap, not FDV — a new token's FDV is usually 2–5× its circulating mcap, so these values are conservative on that axis. We do not predict whether or when any token launches, and we never promise an airdrop. Farm steps say “may qualify” / “positions for”, never “will receive”.</p>
+</section>
+
+<section class="panel" id="proof">
+  <h2>The model, plotted — comparables vs the fitted curve</h2>
+  <div id="scatter"></div>
+  <p class="cap" id="scatterCap"></p>
+</section>
+
+<section class="panel" id="comps">
+  <h2>Category adjustments — from the snapshot's own comparables</h2>
+  <table id="catTable"><thead><tr><th>Category</th><th>Comparables</th><th>Adjustment</th></tr></thead><tbody></tbody></table>
+  <p class="cap">Adjustment = 10^(shrunk median residual). Categories absent here had no tokened comparables and get ×1.00.</p>
+</section>
+
+<footer>
+  <p>Source: DefiLlama snapshot, <span id="asOf2">—</span>. Floor $50M. Board: watchlist + every further pre-token candidate under the floor, same rule for all. “Records no token” means DefiLlama's record carries no gecko_id and no symbol. Farming costs are builder estimates (Nov 2026), not snapshot data. Use one wallet, act organically over weeks, never share a seed phrase, never pay to claim.</p>
+</footer>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

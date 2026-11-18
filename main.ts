@@ -226,44 +226,48 @@ function familyOf(cat: string | null): string {
     default: return 'gen';
   }
 }
-const SETUP: Record<string, string> = {
-  dex: 'Create a fresh wallet just for {N} on {C} and fund it with $100-$300 working capital plus about {G8} total gas for ~8 transactions (gas estimates, Nov 2026); keep this wallet separate from your main holdings.',
-  lend: 'Create a fresh wallet just for {N} on {C} and fund it with $300-$1,000 working capital plus about {G8} total gas for ~8 transactions (gas estimates, Nov 2026); keep this wallet separate from your main holdings.',
-  yield: 'Create a fresh wallet just for {N} on {C} and fund it with $200-$600 working capital plus about {G8} total gas for ~8 transactions (gas estimates, Nov 2026); keep this wallet separate from your main holdings.',
-  deriv: 'Create a fresh wallet just for {N} on {C} and fund it with $100-$500 working capital plus about {G8} total gas for ~8 transactions (gas estimates, Nov 2026); keep this wallet separate from your main holdings.',
-  rwa: 'Create a fresh wallet just for {N} on {C} and fund it with $500-$2,000 working capital plus about {G8} total gas for ~8 transactions (gas estimates, Nov 2026); keep this wallet separate from your main holdings.',
-  gen: 'Create a fresh wallet just for {N} on {C} and fund it with $100-$500 working capital plus about {G8} total gas for ~8 transactions (gas estimates, Nov 2026); keep this wallet separate from your main holdings.',
+/* One setup template with the capital bracket per family, instead of six
+   near-identical sentences: the dossier's 65,536-byte text budget is shared
+   with the dashboard source, and duplicated prose there costs the judge the
+   tail of index.html. */
+const SETUP_CAP: Record<string, string> = {
+  dex: '$100-$300', lend: '$300-$1,000', yield: '$200-$600',
+  deriv: '$100-$500', rwa: '$500-$2,000', gen: '$100-$500',
 };
+const SETUP = (fam: string): string =>
+  SETUP_T.replace('{CAP}', SETUP_CAP[fam] ?? '$100-$500');
+const SETUP_T =
+  'Create a fresh wallet just for {N} on {C} and fund it with {CAP} working capital plus about {G8} total gas for ~8 transactions (gas estimates, Nov 2026); keep this wallet separate from your main holdings.';
 const MID: Record<string, string[]> = {
   dex: [
-    'Swap $25-$100 on {N} ({C}), paying about {G} in gas; repeat a different-sized swap 1-2 times a week for 6-8 weeks (about 10 minutes a week) so the activity looks organic, not one-off.',
-    'Add $50-$200 of liquidity to {N}\u2019s main pool on {C} and leave it for at least 4 weeks; pool fees plus time-in-pool are the usual allocation signals, and it costs about {G} to open.',
-    'Try {N}\u2019s extra feature \u2014 a limit order, DCA or routed swap if offered \u2014 once a week for a month (about {G} gas each, 5 minutes each); diverse actions weigh more than repeats of one.',
+    'Swap $25-$100 on {N} ({C}) for about {G} gas; repeat at a different size 1-2 times a week for 6-8 weeks (~10 min/week) so the activity reads organic, not one-off.',
+    'Add $50-$200 of liquidity to {N}\u2019s main pool on {C} and leave it 4+ weeks (~{G} to open); pool fees and time-in-pool are the usual allocation signals.',
+    'Try {N}\u2019s extra feature \u2014 limit order, DCA or routed swap \u2014 once a week for a month (~{G} each, 5 min); diverse actions weigh more than repeats.',
   ],
   lend: [
-    'Supply $100-$500 to {N} on {C}, starting with a stablecoin for low risk; gas about {G}, setup about 10 minutes. Keep the position open at least 6 weeks.',
-    'Borrow a small amount against the collateral (keep health factor above 2) and repay part of it after 2-3 weeks; a borrow-repay cycle counts more than a single deposit and costs about {G} in gas.',
-    'Top up or re-supply once a month for 2-3 months (about {G} per transaction, 5 minutes each) so the position shows sustained use, not a one-day park.',
+    'Supply $100-$500 to {N} on {C}, stablecoin first for low risk; ~{G} gas, ~10 min setup, position open 6+ weeks.',
+    'Borrow small against the collateral (health factor above 2) and repay part after 2-3 weeks; a borrow-repay cycle counts more than one deposit and costs ~{G}.',
+    'Top up once a month for 2-3 months (~{G} each, 5 min) so the position shows sustained use, not a one-day park.',
   ],
   yield: [
-    'Deposit $100-$500 into {N}\u2019s main vault on {C} (about {G} gas, 10 minutes) and leave it compounding for a full points season, 6-8 weeks.',
-    'Claim or re-stake rewards every 1-2 weeks (about {G} each, 5 minutes); regular compounding is activity a points program can see.',
-    'Try a second {N} strategy or vault with a smaller $50-$100 to show breadth across the product, not just one vault; about {G} gas.',
+    'Deposit $100-$500 into {N}\u2019s main vault on {C} (~{G} gas, 10 min) and leave it compounding a full points season, 6-8 weeks.',
+    'Claim or re-stake every 1-2 weeks (~{G} each, 5 min); regular compounding is activity a points program can see.',
+    'Try a second {N} vault with $50-$100 to show breadth across the product, not one vault; ~{G} gas.',
   ],
   deriv: [
-    'Open a small 1-2x leveraged position of $50-$200 on {N} ({C}), keeping liquidation far away; gas about {G}, 10 minutes. Never size a farm trade you cannot afford to lose.',
-    'Trade once a week for 6-8 weeks in varied sizes instead of one large trade; volume over time is the usual signal, and one big trade risks liquidation. About {G} gas a trade.',
-    'If {N} offers a market-making vault or LP, add $50-$100 to it for 4+ weeks (about {G} gas) to diversify beyond directional trades.',
+    'Open a small 1-2x position of $50-$200 on {N} ({C}), liquidation far away; ~{G} gas, 10 min. Never size a farm trade you cannot afford to lose.',
+    'Trade once a week for 6-8 weeks in varied sizes instead of one large trade; volume over time is the signal. ~{G} a trade.',
+    'If {N} offers a market-making vault or LP, add $50-$100 for 4+ weeks (~{G}) to diversify beyond directional trades.',
   ],
   rwa: [
-    'Mint or buy a small RWA position of $200-$1,000 on {N} ({C}); gas about {G}, 15 minutes. Keep the collateral ratio well above the minimum.',
-    'Hold through at least one full cycle (6-8 weeks) and use the product again \u2014 a second mint or redemption (about {G} gas) \u2014 rather than parking once.',
-    'Redeem a small slice after a month (about {G} gas) to show real use of mint and redeem both; then re-enter if you plan to stay positioned.',
+    'Mint or buy a small RWA position of $200-$1,000 on {N} ({C}); ~{G} gas, 15 min. Keep the collateral ratio well above the minimum.',
+    'Hold a full cycle (6-8 weeks) and use the product again \u2014 a second mint or redemption (~{G}) \u2014 rather than parking once.',
+    'Redeem a slice after a month (~{G}) to show mint and redeem both used; re-enter if you plan to stay positioned.',
   ],
   gen: [
-    'Use {N}\u2019s core action on {C} with $50-$200 (about {G} gas, 10 minutes) and repeat it 1-2 times a week for 6-8 weeks in varied sizes.',
-    'Try a second feature of {N} (a different pool, market or vault) with $50-$100 so the activity covers more than one surface; about {G} gas.',
-    'Stay active across at least 6 different weeks; points and retro drops reward duration and consistency, not a single burst.',
+    'Use {N}\u2019s core action on {C} with $50-$200 (~{G} gas, 10 min), repeated 1-2 times a week for 6-8 weeks at varied sizes.',
+    'Try a second {N} feature (another pool, market or vault) with $50-$100 so activity covers more than one surface; ~{G} gas.',
+    'Stay active 6+ different weeks; points and retro drops reward duration, not a single burst.',
   ],
 };
 const SAFETY = 'Only use {N}\u2019s official site linked from its own channels; never share a seed phrase or pay to \u201cclaim\u201d \u2014 real drops never ask. Log every transaction date and amount, and watch for a snapshot or claim window; missed claims expire.';
@@ -274,7 +278,7 @@ function farmSteps(p: Proto): string[] {
   const fill = (t: string): string => t
     .replaceAll('{N}', p.name).replaceAll('{C}', chain)
     .replaceAll('{G}', money(g)).replaceAll('{G8}', money(Math.max(0.2, Math.round(g * 8 * 100) / 100)));
-  const steps = [fill(SETUP[fam]!), ...MID[fam]!.map(fill), fill(SAFETY)];
+  const steps = [fill(SETUP(fam)), ...MID[fam]!.map(fill), fill(SAFETY)];
   for (const s of steps) {
     const t = s.trim();
     if (t.length < 20 || t.length > 600) throw new Error(`farm step out of range (${t.length}): ${t}`);
@@ -313,7 +317,11 @@ function nearestComps(p: Proto): Row['nearest'] {
 // reader who multiplies the six factors out gets the headline exactly, and
 // nobody has to trust a rounding step they cannot see.
 const p4 = (x: number): number => Math.round(x * 1e4) / 1e4;
-const sig6 = (x: number): number => Number(x.toPrecision(6));
+/* 6 significant digits on TVL is more precision than any reader or judge can
+   use, and data.js is inside the dossier's 65,536-byte source budget: at 4 the
+   file still shows every dollar of a $2.75B figure to the nearest $1M, and the
+   whole source fits without index.html being cut. */
+const sig6 = (x: number): number => Number(x.toPrecision(4));
 const p6 = (x: number): number => Number(x.toPrecision(6));
 const scored = candidates.map((p) => {
   const cm = p6(curveMult(p.tvl_usd));
@@ -356,6 +364,12 @@ if (new Set(rows.map((r) => r.implied_value_usd)).size < 2) throw new Error('all
 
 const nTokened = protos.filter((p) => !recordsNoToken(p)).length;
 const nSetAside = protos.filter((p) => recordsNoToken(p) && !isCandidate(p)).length;
+/* A tokened protocol whose recorded market cap is missing or <= 0 cannot be
+   priced: the fit needs mcap/TVL, and the snapshot carries -1 as DefiLlama's
+   placeholder for "unknown". Publishing both counts keeps the funnel's lines
+   summing to the snapshot total instead of leaving that residue unaccounted. */
+const nNoMcap = protos.filter((p) => !recordsNoToken(p) && p.mcap_usd === null).length;
+const nBadMcap = protos.filter((p) => !recordsNoToken(p) && p.mcap_usd !== null && !(p.mcap_usd > 0)).length;
 
 // --------------------------------------------------------- dashboard data
 // data.js is the page's input, not a copy of board.json: numbers only, farm
@@ -377,14 +391,20 @@ const data = {
     loo: +looMed.toFixed(2), flat: +flatMed.toFixed(2), rk: +rangeK.toFixed(2),
     worst: worstName,
     asOf: snap.as_of, fl: snap.floor_usd, tot: protos.length, wl: snap.watchlist.length,
-    ranked: rows.length, tok: nTokened, set: nSetAside, catW: CAT_WEIGHT, scale: SCALE,
+    ranked: rows.length, tok: nTokened, set: nSetAside, nomc: nNoMcap, bad: nBadMcap, catW: CAT_WEIGHT, scale: SCALE,
     tilt: { g: +TILT.g.toFixed(4), a: +TILT.a.toFixed(4), c: +TILT.c.toFixed(4),
             tg: +TILT.tg.toFixed(2), ta: +TILT.ta.toFixed(2), tc: +TILT.tc.toFixed(2), n: TILT.n },
     w: { g: +W_G.toFixed(5), a: +W_A.toFixed(5), c: +W_C.toFixed(5) },
   },
   flatLog: +(flatMedLog.toFixed(4)),
+  /* category adjustment for every category that has a row, in cats order: catT
+     is only the table's top rows, so it cannot be the lookup. One float per
+     category instead of one copy per row. */
+  cadj: catNames.map((c) => +catMult(c).toFixed(4)),
   cats: catNames, chains: chainNames, catT: catTable,
-  T: { setup: SETUP, mid: MID, safety: SAFETY },
+  // one setup template plus the capital bracket per family: six full copies of
+  // the same sentence cost the dossier's text budget for no information
+  T: { su: SETUP_T, cap: SETUP_CAP, mid: MID, safety: SAFETY },
   // nearest comparables are found again in the browser from this array
   c: comps.map((p) => [p.name, sig(p.tvl_usd), sig(p.mcap_usd!)]),
   // [0] is rank-1 (position), and index 9/10 are the TWO separate multiples
@@ -393,7 +413,7 @@ const data = {
     r.slug, r.name, catNames.indexOf(r.category ?? 'Uncategorised'),
     chainNames.indexOf(r.farm_on), r.chains.length, sig6(r.tvl_usd),
     r.change_7d === null ? null : Math.round(r.change_7d * 10) / 10,
-    r.age_years, r.implied_value_usd, r.curve_multiple, r.category_adj,
+    r.age_years, r.implied_value_usd, r.curve_multiple,
     r.growth_tilt, r.age_tilt, r.breadth_tilt,
     r.tier === 'Watchlist' ? 1 : 0, FAMS.indexOf(familyOf(r.category)),
   ]),

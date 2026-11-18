@@ -1,4 +1,4 @@
-/* Token Launch Radar — reads window.RADAR (written by main.ts) and renders the board.
+/* Token Launch Radar — reads window.RADAR (from main.ts), renders the board.
    No network, no dependencies. Every number shown is recomputed from data.js in front of the reader. */
 (() => {
   const D = window.RADAR;
@@ -6,8 +6,7 @@
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; };
 
-  /* ---------- formatting ---------- */
-  function usd(x) {
+    function usd(x) {
     if (x == null || !isFinite(x)) return '—';
     if (x >= 1e9) return '$' + (x / 1e9).toFixed(x >= 1e10 ? 0 : 2) + 'B';
     if (x >= 1e6) return '$' + (x / 1e6).toFixed(x >= 1e8 ? 0 : 2) + 'M';
@@ -15,6 +14,13 @@
     return '$' + x.toFixed(0);
   }
   const usdFull = (x) => '$' + Math.round(x).toLocaleString('en-US');
+  /* per-$1K figures sit between 1 and 200 dollars, where usd()'s integer
+     rounding drops a real digit (4.10 printed as "$4" reads as a 10x error) */
+  function usd2(x) {
+    if (x == null || !isFinite(x)) return '—';
+    if (x >= 1e3) return usd(x);
+    return '$' + x.toFixed(2);
+  }
   /* multiples span 0.001x to 100x, so a fixed one-decimal format would print
      "0.0x" for every small one; pick precision from the magnitude instead */
   function fmtMult(m) {
@@ -53,15 +59,29 @@
     ['Watchlist', M.wl],
     ['Fit error (LOO)', '×' + M.loo.toFixed(2)],
   ];
+  /* LOO = leave-one-out: refit the curve without one comparable, predict that
+     one, and take the fold error. x3.40 means the typical miss is 3.40x, either
+     way -- the honest scale of a valuation like this, and the number the flat
+     median's x4.86 is measured against. */
+  const kpiNotes = [
+    'Every protocol in the sealed snapshot, at any TVL.',
+    'Pre-token protocols on the board: the watchlist first, then every candidate under the floor.',
+    'Tokened protocols the curve is fitted on: both a market cap and a TVL on record.',
+    'The house rule\'s list of pre-token protocols at or above the $' + (M.fl / 1e6) + 'M floor. A floor, never a ceiling.',
+    'Leave-one-out error: leave one comparable out, refit, predict it, take the fold error. The flat-median model scores ×' + M.flat.toFixed(2) + '.',
+  ];
   kpis.forEach(([l, v], i) => {
     const k = el('div', 'kpi' + (i === 4 ? ' hi' : ''));
+    k.title = kpiNotes[i];
     k.appendChild(el('span', 'l', l));
     k.appendChild(el('span', 'v', String(v)));
     $('kpis').appendChild(k);
   });
 
-  /* ---------- rows -> objects ---------- */
-  const FAMS = ['dex', 'lend', 'yield', 'deriv', 'rwa', 'gen'];
+    const FAMS = ['dex', 'lend', 'yield', 'deriv', 'rwa', 'gen'];
+  /* category adjustment is per-category, not per-row: D.cadj is one multiplier
+     per entry of D.cats, so a[2] indexes it directly. catT is only the table's
+     top rows and would silently miss every category it does not name. */
   /* nearest comparables by log-TVL distance, computed here from D.c */
   function nearest(tvl, k) {
     const lt = Math.log10(tvl);
@@ -79,8 +99,9 @@
     rank: i + 1, slug: a[0], name: a[1],
     cat: D.cats[a[2]], chain: D.chains[a[3]], nchains: a[4],
     tvl: a[5], chg: a[6], age: a[7], implied: a[8],
-    cm: a[9], ca: a[10], gt: a[11], at: a[12], bt: a[13],
-    wl: a[14] === 1, fam: FAMS[a[15]],
+    cm: a[9], ca: D.cadj[a[2]] ?? 1,
+    gt: a[10], at: a[11], bt: a[12],
+    wl: a[13] === 1, fam: FAMS[a[14]],
     gas: GAS[D.chains[a[3]]] ?? 1,
     lo: a[8] / M.rk, hi: a[8] * M.rk,
     slice: (a[8] * 0.1 * 1000) / a[5],
@@ -95,7 +116,7 @@
       .replace(/\{G\}/g, money(gas));
   }
   function plan(r) {
-    const out = [fill(D.T.setup[r.fam], r.name, r.chain, r.gas)];
+    const out = [fill(D.T.su.replace('{CAP}', D.T.cap[r.fam] ?? '$100-$500'), r.name, r.chain, r.gas)];
     for (const t of D.T.mid[r.fam]) out.push(fill(t, r.name, r.chain, r.gas));
     out.push(fill(D.T.safety, r.name, r.chain, r.gas));
     return out;
@@ -148,7 +169,7 @@
         ['num', ageStr(r.age)],
         ['num iv', usd(r.implied)],
         ['num mult', (r.cm * r.ca).toFixed(3) + '×'],
-        ['num', usd(r.slice)],
+        ['num', usd2(r.slice)],
         ['num', r.wl ? 'WATCH' : 'FLOOR'],
       ];
       tds.forEach(([c, txt, sub]) => {
@@ -194,7 +215,8 @@
     const kv = el('div', 'kv');
     [['TVL', usd(r.tvl)], ['7-day', pct(r.chg)], ['Age', ageStr(r.age)],
      ['Chains', String(r.nchains)], ['Tier', r.wl ? 'Watchlist' : 'Below floor'],
-     ['$ per $1K', usd(r.slice)]].forEach(([l, v]) => {
+     ['$ / $1K @10% float', usd2(r.slice)],
+     ['$ / $1K full supply', usd2(r.slice * 10)]].forEach(([l, v]) => {
       const d = el('div');
       d.appendChild(el('span', 'l', l));
       d.appendChild(el('span', 'v', v));
@@ -239,17 +261,26 @@
     r.near.forEach((i) => {
       const c = D.c[i];
       if (!c) return;
+      // Each comparable is priced by the curve at ITS OWN TVL, not by the
+      // subject's multiple: the column exists so a reader can check the fit
+      // against the real mcap beside it. Using r.cm here made every row print
+      // the subject's multiple and the column stopped reconciling.
+      const cMult = 10 ** (M.a + M.b * Math.log10(c[1]));
       const tr = el('tr');
       tr.appendChild(el('td', null, c[0]));
       tr.appendChild(el('td', 'num', usd(c[1])));
-      tr.appendChild(el('td', 'num', (c[2] / c[1]).toFixed(3) + '×'));
-      tr.appendChild(el('td', 'num', usd(Math.round(c[1] * r.cm * r.ca))));
+      const actual = (c[2] / c[1]).toFixed(3) + '×';
+      tr.appendChild(el('td', 'num', actual));
+      const impliedCell = el('td', 'num', usd(Math.round(c[1] * cMult)));
+      impliedCell.appendChild(el('div', 'op',
+        'err ' + (c[2] / c[1] / cMult).toFixed(2) + '×'));
+      tr.appendChild(impliedCell);
       ct.appendChild(tr);
     });
     body.appendChild(ct);
     body.appendChild(el('p', 'cap',
-      'These are tokened protocols at a similar TVL — the model\'s actual evidence. Its implied value for them is what the curve and ' +
-      'category adjustment alone say, before the tilts.'));
+      'These are tokened protocols at a similar TVL — the model\'s actual evidence. "It implies" is the curve at that protocol\'s own TVL, ' +
+      'before any tilt; "err" is how far its real mcap ÷ TVL sits from that, so you can see the fit\'s own misses rather than a summary of them.'));
 
     body.appendChild(el('h3', null, 'Farm plan'));
     const pl = el('div', 'plan');
@@ -283,6 +314,32 @@
     tr.appendChild(el('td', 'num', typeof w === 'number' ? w.toFixed(5) : w));
     ft.appendChild(tr);
   });
+    const fk = D.m;
+  const funnelRows = [
+    ['Ranked on the board (pre-token, passes the rule)', fk.ranked, 'pos'],
+    ['Tokened, usable as comparables (mcap and TVL on record)', fk.n, ''],
+    ['Tokened, no market cap on record (cannot price)', fk.nomc, ''],
+    ['Tokened, market cap recorded as -1 (placeholder)', fk.bad, ''],
+    ['Pre-token, set aside as a venue, wrapper or version tail', fk.set, ''],
+  ];
+  const funT = document.querySelector('#funnelTable tbody');
+  if (funT) {
+    let sum = 0;
+    funnelRows.forEach(([n, c]) => {
+      sum += c;
+      const tr = el('tr');
+      tr.appendChild(el('td', null, n));
+      tr.appendChild(el('td', 'num', String(c)));
+      tr.appendChild(el('td', 'num', (100 * c / fk.tot).toFixed(1) + '%'));
+      funT.appendChild(tr);
+    });
+    const trT = el('tr', 'sum');
+    trT.appendChild(el('td', null, 'Every protocol in the snapshot'));
+    trT.appendChild(el('td', 'num', String(sum)));
+    trT.appendChild(el('td', 'num', (100 * sum / fk.tot).toFixed(0) + '%'));
+    funT.appendChild(trT);
+  }
+
   const ot = document.querySelector('#oosTable tbody');
   [
     ['Curve, leave-one-out median error', '×' + M.loo.toFixed(2), 'pos'],
@@ -365,7 +422,7 @@
   render();
 
   /* ---------- deterministic deep links, used for the screenshots ----------
-     #/p/<slug>   opens that protocol's drawer
+     #/p/<slug> opens that protocol's drawer
      #/f/<cat>    filters the board to one category (URL-encoded)            */
   function fromHash() {
     const h = location.hash || '';

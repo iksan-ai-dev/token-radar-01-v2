@@ -9,7 +9,7 @@ mkdirSync(OUT, { recursive: true });
 
 const CHROME = '/home/agentuser/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome';
 const args = [
-  '--headless=new', '--no-sandbox', '--disable-gpu', '--hide-scrollbars',
+  '--headless=new', '--no-sandbox', '--disable-gpu',
   '--force-device-scale-factor=1',
   '--remote-debugging-port=9222',
   '--window-size=1440,1440',

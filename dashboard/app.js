@@ -1,28 +1,27 @@
-/* Token Launch Radar — reads window.RADAR (from main.ts), renders the board.
-   No network, no dependencies. Every number shown is recomputed from data.js in front of the reader. */
+/* Token Launch Radar — reads window.RADAR, renders the board. No network; every number recomputed from data.js in front of the reader. */
 (() => {
   const D = window.RADAR;
   const M = D.m;
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; };
 
-    function usd(x) {
+  /* 3 significant digits everywhere */
+  function usd(x) {
     if (x == null || !isFinite(x)) return '—';
-    if (x >= 1e9) return '$' + (x / 1e9).toFixed(x >= 1e10 ? 0 : 2) + 'B';
-    if (x >= 1e6) return '$' + (x / 1e6).toFixed(x >= 1e8 ? 0 : 2) + 'M';
-    if (x >= 1e3) return '$' + (x / 1e3).toFixed(x >= 1e4 ? 0 : 1) + 'K';
+    const s = (v, u) => '$' + v.toPrecision(3) + u;
+    if (x >= 1e9) return s(x / 1e9, 'B');
+    if (x >= 1e6) return s(x / 1e6, 'M');
+    if (x >= 1e3) return s(x / 1e3, 'K');
     return '$' + x.toFixed(0);
   }
   const usdFull = (x) => '$' + Math.round(x).toLocaleString('en-US');
-  /* per-$1K figures sit between 1 and 200 dollars, where usd()'s integer
-     rounding drops a real digit (4.10 printed as "$4" reads as a 10x error) */
+  /* per-$1K needs cents: integer rounding reads as a 10x error */
   function usd2(x) {
     if (x == null || !isFinite(x)) return '—';
     if (x >= 1e3) return usd(x);
     return '$' + x.toFixed(2);
   }
-  /* multiples span 0.001x to 100x, so a fixed one-decimal format would print
-     "0.0x" for every small one; pick precision from the magnitude instead */
+  /* precision follows magnitude: multiples span 0.001x to 100x */
   function fmtMult(m) {
     if (m >= 100) return Math.round(m) + '×';
     if (m >= 10) return m.toFixed(0) + '×';
@@ -57,18 +56,15 @@
     ['Pre-token ranked', M.ranked],
     ['Comparables', M.n],
     ['Watchlist', M.wl],
-    ['Fit error (LOO)', '×' + M.loo.toFixed(2)],
+    ['Fit error (LOO)', M.loo.toFixed(2) + '×'],
   ];
-  /* LOO = leave-one-out: refit the curve without one comparable, predict that
-     one, and take the fold error. x3.40 means the typical miss is 3.40x, either
-     way -- the honest scale of a valuation like this, and the number the flat
-     median's x4.86 is measured against. */
+  /* LOO: refit without one comparable, predict it, take the fold error. */
   const kpiNotes = [
     'Every protocol in the sealed snapshot, at any TVL.',
-    'Pre-token protocols on the board: the watchlist first, then every candidate under the floor.',
-    'Tokened protocols the curve is fitted on: both a market cap and a TVL on record.',
-    'The house rule\'s list of pre-token protocols at or above the $' + (M.fl / 1e6) + 'M floor. A floor, never a ceiling.',
-    'Leave-one-out error: leave one comparable out, refit, predict it, take the fold error. The flat-median model scores ×' + M.flat.toFixed(2) + '.',
+    'Pre-token protocols: watchlist first, then every candidate under the floor.',
+    'Tokened protocols the curve fits on: a market cap and a TVL on record.',
+    'The house list at or above the $' + (M.fl / 1e6) + 'M floor. A floor, never a ceiling.',
+    'Leave-one-out: refit without each comparable, predict it, median fold error. Flat median: ' + M.flat.toFixed(2) + '×.',
   ];
   kpis.forEach(([l, v], i) => {
     const k = el('div', 'kpi' + (i === 4 ? ' hi' : ''));
@@ -79,9 +75,7 @@
   });
 
     const FAMS = ['dex', 'lend', 'yield', 'deriv', 'rwa', 'gen'];
-  /* category adjustment is per-category, not per-row: D.cadj is one multiplier
-     per entry of D.cats, so a[2] indexes it directly. catT is only the table's
-     top rows and would silently miss every category it does not name. */
+  /* D.cadj is one multiplier per D.cats entry; a[2] indexes it. catT is only the table's top rows. */
   /* nearest comparables by log-TVL distance, computed here from D.c */
   function nearest(tvl, k) {
     const lt = Math.log10(tvl);
@@ -100,8 +94,8 @@
     cat: D.cats[a[2]], chain: D.chains[a[3]], nchains: a[4],
     tvl: a[5], chg: a[6], age: a[7], implied: a[8],
     cm: a[9], ca: D.cadj[a[2]] ?? 1,
-    gt: a[10], at: a[11], bt: a[12],
-    wl: a[13] === 1, fam: FAMS[a[14]],
+    gm: a[10], am: a[11], bm: a[12],
+    wl: a[13] === 1, fam: FAMS[D.fam[a[2]]],
     gas: GAS[D.chains[a[3]]] ?? 1,
     lo: a[8] / M.rk, hi: a[8] * M.rk,
     slice: (a[8] * 0.1 * 1000) / a[5],
@@ -183,12 +177,17 @@
       frag.appendChild(tr);
     });
     tbody.appendChild(frag);
-    $('count').textContent = v.length === rows.length
+    const ft = [fCat.value, fChain.value,
+      fTier.value === '1' ? 'watchlist only' : fTier.value === '0' ? 'below floor' : '',
+      fq.value.trim() && '"' + fq.value.trim() + '"'].filter(Boolean).join(' · ');
+    $('count').textContent = (v.length === rows.length
       ? rows.length + ' rows · watchlist ' + D.m.wl + ' · all candidates under the floor included'
-      : v.length + ' of ' + rows.length + ' rows shown';
+      : v.length + ' of ' + rows.length + ' rows') + (ft ? ' · ' + ft : '');
+    $('clearF').hidden = !ft;
     $('sortNote').textContent = sortKey === 'rank' ? '' : 'Sorted by ' + fSort.options[fSort.selectedIndex].text.toLowerCase() + '.';
   }
   [fq, fCat, fChain, fTier].forEach((n) => n.addEventListener('input', render));
+  $('clearF').addEventListener('click', () => { fq.value = ''; fCat.value = ''; fChain.value = ''; fTier.value = ''; render(); });
   fSort.addEventListener('change', () => { sortKey = fSort.value; render(); });
 
   /* ---------- drawer ---------- */
@@ -214,9 +213,9 @@
 
     const kv = el('div', 'kv');
     [['TVL', usd(r.tvl)], ['7-day', pct(r.chg)], ['Age', ageStr(r.age)],
-     ['Chains', String(r.nchains)], ['Tier', r.wl ? 'Watchlist' : 'Below floor'],
-     ['$ / $1K @10% float', usd2(r.slice)],
-     ['$ / $1K full supply', usd2(r.slice * 10)]].forEach(([l, v]) => {
+     ['Chains', String(r.nchains)], ['Tier (house list)', r.wl ? 'Watchlist' : 'Below floor'],
+     ['$/$1K @10% float', usd2(r.slice)],
+     ['$/$1K full supply', usd2(r.slice * 10)]].forEach(([l, v]) => {
       const d = el('div');
       d.appendChild(el('span', 'l', l));
       d.appendChild(el('span', 'v', v));
@@ -227,33 +226,42 @@
     body.appendChild(el('h3', null, 'How the number is built'));
     const wf = el('div', 'wf');
     const t = el('table');
+    const thr = el('tr');
+    ['Step', 'Value', 'Running'].forEach((h, i) => thr.appendChild(el('th', i ? 'num' : null, h)));
+    const thd = el('thead'); thd.appendChild(thr); t.appendChild(thd);
+    let run = r.tvl;
     const rowsWf = [
-      ['TVL, from the snapshot', usdFull(r.tvl), '', 0],
-      ['× size curve multiple', r.cm.toFixed(4), 'at this TVL on the fitted line', 0],
-      ['× category adjustment', r.ca.toFixed(4), (r.cat || 'Uncategorised') + ', shrunk', 0],
-      ['× growth tilt', (10 ** r.gt).toFixed(4), '7-day ' + pct(r.chg) + ', coefficient ' + M.w.g, 0],
-      ['× age tilt', (10 ** r.at).toFixed(4), ageStr(r.age) + ' listed, coefficient ' + M.w.a, 0],
-      ['× breadth tilt', (10 ** r.bt).toFixed(4), r.nchains + ' chain(s), coefficient ' + M.w.c, 0],
+      ['TVL, from the snapshot', usdFull(r.tvl), '', null],
+      ['× size curve multiple', String(r.cm), 'at this TVL on the fitted line', r.cm],
+      ['× category adjustment', r.ca.toFixed(4), (r.cat || 'Uncategorised') + ', shrunk', r.ca],
+      ['× growth tilt', r.gm.toFixed(4), '7-day ' + pct(r.chg) + ', coefficient ' + M.w.g, r.gm],
+      ['× age tilt', r.am.toFixed(4), ageStr(r.age) + ' listed, coefficient ' + M.w.a, r.am],
+      ['× breadth tilt', r.bm.toFixed(4), r.nchains + ' chain(s), coefficient ' + M.w.c, r.bm],
     ];
-    rowsWf.forEach(([l, v, note]) => {
+    rowsWf.forEach(([l, v, note, f]) => {
+      if (f != null) run *= f;
       const tr = el('tr');
       tr.appendChild(el('td', null, l));
       const td = el('td', 'num', v);
       if (note) { td.appendChild(el('div', 'op', note)); }
       tr.appendChild(td);
+      tr.appendChild(el('td', 'num run', usdFull(Math.round(run))));
       t.appendChild(tr);
     });
     const trS = el('tr', 'sum');
     trS.appendChild(el('td', null, '= implied value'));
-    trS.appendChild(el('td', 'num', usdFull(Math.round(afterB))));
+    trS.appendChild(el('td', 'num', ''));
+    trS.appendChild(el('td', 'num', usdFull(r.implied)));
     t.appendChild(trS);
     wf.appendChild(t);
     body.appendChild(wf);
     body.appendChild(el('p', 'cap',
+      'Each tilt = 10^(w·x) to 4 dp; the multiple to 5 sig figs. The right column is their exact running product.'));
+    body.appendChild(el('p', 'cap',
       'Range: the curve\'s residual SD is ' + M.sd + ' in log₁₀, so the P25–P75 band is ÷' + M.rk + ' to ×' + M.rk +
       '. Recomputed here from data.js, not copied from the board.'));
 
-    body.appendChild(el('h3', null, 'Nearest comparables'));
+    body.appendChild(el('h3', null, 'Similar-TVL comparables'));
     const ct = el('table', 'comps');
     const thead = el('tr');
     ['Protocol', 'TVL', 'mcap ÷ TVL', 'it implies'].forEach((x, i) => thead.appendChild(el('th', i ? 'num' : null, x)));
@@ -261,19 +269,16 @@
     r.near.forEach((i) => {
       const c = D.c[i];
       if (!c) return;
-      // Each comparable is priced by the curve at ITS OWN TVL, not by the
-      // subject's multiple: the column exists so a reader can check the fit
-      // against the real mcap beside it. Using r.cm here made every row print
-      // the subject's multiple and the column stopped reconciling.
+      // priced by the curve at each comparable's OWN TVL, checkable vs its real mcap
       const cMult = 10 ** (M.a + M.b * Math.log10(c[1]));
       const tr = el('tr');
       tr.appendChild(el('td', null, c[0]));
       tr.appendChild(el('td', 'num', usd(c[1])));
-      const actual = (c[2] / c[1]).toFixed(3) + '×';
+      const actual = c[2].toFixed(3) + '×';
       tr.appendChild(el('td', 'num', actual));
       const impliedCell = el('td', 'num', usd(Math.round(c[1] * cMult)));
       impliedCell.appendChild(el('div', 'op',
-        'err ' + (c[2] / c[1] / cMult).toFixed(2) + '×'));
+        'err ' + (c[2] / cMult).toFixed(2) + '×'));
       tr.appendChild(impliedCell);
       ct.appendChild(tr);
     });
@@ -342,8 +347,8 @@
 
   const ot = document.querySelector('#oosTable tbody');
   [
-    ['Curve, leave-one-out median error', '×' + M.loo.toFixed(2), 'pos'],
-    ['Flat median multiple, same test', '×' + M.flat.toFixed(2), 'neg'],
+    ['Curve, leave-one-out median error', M.loo.toFixed(2) + '×', 'pos'],
+    ['Flat median multiple, same test', M.flat.toFixed(2) + '×', 'neg'],
     ['Fold error the curve removes', (M.flat / M.loo).toFixed(2) + '×', 'pos'],
     ['Residual SD (log₁₀)', M.sd.toFixed(3), ''],
     ['P25–P75 band', '÷' + M.rk + ' / ×' + M.rk, ''],
@@ -369,7 +374,7 @@
   /* ---------- scatter ---------- */
   (function scatter() {
     const W = 620, H = 300, P = { l: 44, r: 14, t: 12, b: 34 };
-    const pts = D.c.map(([n, tvl, mc]) => ({ n, x: Math.log10(tvl), y: Math.log10(mc / tvl) }));
+    const pts = D.c.map(([n, tvl, ratio]) => ({ n, x: Math.log10(tvl), y: Math.log10(ratio) }));
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
     const x0 = Math.min(...xs) - 0.15, x1 = Math.max(...xs) + 0.15;
     const y0 = Math.min(...ys) - 0.2, y1 = Math.max(...ys) + 0.2;
@@ -382,13 +387,13 @@
     // grid + axes
     for (let g = Math.ceil(x0); g <= Math.floor(x1); g++) {
       s.appendChild(mk('line', { x1: sx(g), y1: P.t, x2: sx(g), y2: H - P.b, stroke: '#182231', 'stroke-width': 1 }));
-      const tx = mk('text', { x: sx(g), y: H - P.b + 14, fill: '#5d7083', 'font-size': 9, 'text-anchor': 'middle' });
+      const tx = mk('text', { x: sx(g), y: H - P.b + 14, fill: '#93a8be', 'font-size': 9, 'text-anchor': 'middle' });
       tx.textContent = '$' + usd(10 ** g).replace('$', '');
       s.appendChild(tx);
     }
     for (let g = Math.ceil(y0); g <= Math.floor(y1); g++) {
       s.appendChild(mk('line', { x1: P.l, y1: sy(g), x2: W - P.r, y2: sy(g), stroke: '#182231', 'stroke-width': 1 }));
-      const ty = mk('text', { x: P.l - 6, y: sy(g) + 3, fill: '#5d7083', 'font-size': 9, 'text-anchor': 'end' });
+      const ty = mk('text', { x: P.l - 6, y: sy(g) + 3, fill: '#93a8be', 'font-size': 9, 'text-anchor': 'end' });
       ty.textContent = fmtMult(10 ** g);
       s.appendChild(ty);
     }
@@ -405,7 +410,10 @@
     rows.slice(0, 3).forEach((r) => {
       s.appendChild(mk('circle', { cx: sx(Math.log10(r.tvl)), cy: sy(Math.log10(r.implied / r.tvl)), r: 4.6, fill: 'none', stroke: '#a78bfa', 'stroke-width': 1.8 }));
     });
-    const lbl = mk('text', { x: W - P.r, y: P.t + 10, fill: '#a78bfa', 'font-size': 9, 'text-anchor': 'end' });
+    const yl = mk('text', { x: 11, y: (H + P.t) / 2, fill: '#aebfd0', 'font-size': 9.5, 'text-anchor': 'middle', transform: 'rotate(-90 11 ' + (H + P.t) / 2 + ')' });
+    yl.textContent = 'mcap ÷ TVL (log)';
+    s.appendChild(yl);
+    const lbl = mk('text', { x: W - P.r, y: P.t + 10, fill: '#b9a3fb', 'font-size': 10.5, 'text-anchor': 'end' });
     lbl.textContent = '◯ top 3 implied values';
     s.appendChild(lbl);
     const xl = mk('text', { x: (W + P.l) / 2, y: H - 4, fill: '#8a9bad', 'font-size': 9.5, 'text-anchor': 'middle' });
@@ -421,9 +429,7 @@
 
   render();
 
-  /* ---------- deterministic deep links, used for the screenshots ----------
-     #/p/<slug> opens that protocol's drawer
-     #/f/<cat>    filters the board to one category (URL-encoded)            */
+  /* deterministic deep links for the screenshots: #/p/<slug>, #/f/<cat> */
   function fromHash() {
     const h = location.hash || '';
     let m = /^#\/p\/(.+)$/.exec(h);

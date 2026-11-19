@@ -261,21 +261,21 @@ const SETUP_CAP: Record<string, string> = {
 const SETUP = (fam: string): string =>
   SETUP_T.replace('{CAP}', SETUP_CAP[fam] ?? '$100-$500');
 const SETUP_T =
-  'Create a fresh wallet just for {N} on {C} and fund it with {CAP} working capital plus about {G8} total gas for ~8 transactions (gas estimates, Nov 2026); keep this wallet separate from your main holdings.';
+  'Create a fresh wallet just for {N} on {C} and fund it with {CAP} working capital plus about {G8} gas for the first ~8 transactions; each later action below costs about {G} more (gas estimates, Nov 2026). Keep this wallet separate from your main holdings.';
 const MID: Record<string, string[]> = {
   dex: [
-    'Swap $25-$100 on {N} ({C}) for about {G} gas; repeat at a different size 1-2 times a week for 6-8 weeks (~10 min/week) so the activity reads organic, not one-off.',
+    'Swap $25-$100 on {N} ({C}) for about {G} gas; repeat at a different size 1-2 times a week for 6-8 weeks (~10 min/week) so activity reads organic.',
     'Add $50-$200 of liquidity to {N}\u2019s main pool on {C} and leave it 4+ weeks (~{G} to open); pool fees and time-in-pool are the usual allocation signals.',
     'Try {N}\u2019s extra feature \u2014 limit order, DCA or routed swap \u2014 once a week for a month (~{G} each, 5 min); diverse actions weigh more than repeats.',
   ],
   lend: [
     'Supply $100-$500 to {N} on {C}, stablecoin first for low risk; ~{G} gas, ~10 min setup, position open 6+ weeks.',
     'Borrow small against the collateral (health factor above 2) and repay part after 2-3 weeks; a borrow-repay cycle counts more than one deposit and costs ~{G}.',
-    'Top up once a month for 2-3 months (~{G} each, 5 min) so the position shows sustained use, not a one-day park.',
+    'Top up once a month for 2-3 months (~{G} each, 5 min) showing sustained use, not a one-day park.',
   ],
   yield: [
     'Deposit $100-$500 into {N}\u2019s main vault on {C} (~{G} gas, 10 min) and leave it compounding a full points season, 6-8 weeks.',
-    'Claim or re-stake every 1-2 weeks (~{G} each, 5 min); regular compounding is activity a points program can see.',
+    'Claim or re-stake every 1-2 weeks (~{G} each, 5 min); regular compounding is visible activity.',
     'Try a second {N} vault with $50-$100 to show breadth across the product, not one vault; ~{G} gas.',
   ],
   deriv: [
@@ -291,10 +291,10 @@ const MID: Record<string, string[]> = {
   gen: [
     'Use {N}\u2019s core action on {C} with $50-$200 (~{G} gas, 10 min), repeated 1-2 times a week for 6-8 weeks at varied sizes.',
     'Try a second {N} feature (another pool, market or vault) with $50-$100 so activity covers more than one surface; ~{G} gas.',
-    'Stay active 6+ different weeks; points and retro drops reward duration, not a single burst.',
+    'Stay active 6+ different weeks; drops reward duration, not one burst.',
   ],
 };
-const SAFETY = 'Only use {N}\u2019s official site linked from its own channels; never share a seed phrase or pay to \u201cclaim\u201d \u2014 real drops never ask. Log every transaction date and amount, and watch for a snapshot or claim window; missed claims expire.';
+const SAFETY = 'Only use {N}\u2019s official site linked from its own channels; never share a seed phrase or pay to \u201cclaim\u201d \u2014 real drops never ask. Log every transaction; watch for the snapshot or claim window — missed claims expire.';
 function farmSteps(p: Proto): string[] {
   const fam = familyOf(p.category);
   const chain = p.chains[0] ?? 'Ethereum';
@@ -330,7 +330,7 @@ interface Row {
   farm_steps: string[]; category: string | null; chains: string[]; tvl_usd: number;
   change_7d: number | null; age_years: number | null; multiple_used: number;
   curve_multiple: number; category_adj: number;
-  growth_tilt: number; age_tilt: number; breadth_tilt: number;
+  growth_mult: number; age_mult: number; breadth_mult: number;
   implied_lo_usd: number; implied_hi_usd: number; slice_per_1k_usd: number;
   farm_on: string; tier: string;
   nearest: { slug: string; name: string; tvl_usd: number; multiple: number }[];
@@ -364,20 +364,21 @@ const p4 = (x: number): number => Math.round(x * 1e4) / 1e4;
    file still shows every dollar of a $2.75B figure to the nearest $1M, and the
    whole source fits without index.html being cut. */
 const sig6 = (x: number): number => Number(x.toPrecision(4));
-const p6 = (x: number): number => Number(x.toPrecision(6));
+const p5 = (x: number): number => Number(x.toPrecision(5));
 const scored = candidates.map((p) => {
-  const cm = p6(curveMult(p.tvl_usd));
+  const cm = p5(curveMult(p.tvl_usd));
   const ca = p4(catMult(p.category));
   const g = clamp((p.change_7d ?? 0) / 25, -1, 1);
-  const gt = p4(W_G * g);
   const ay = ageYears(p);
-  const at = ay === null ? 0 : p4(W_A * lg(Math.max(0.08, ay)));
-  const bt = p4(W_C * (lg(Math.max(1, p.chains.length)) - lg(2)) / lg(2));
-  // implied value = TVL x the four published multipliers, nothing else, so a
-  // reader who multiplies the waterfall out lands on the headline exactly
-  const raw = sig6(p.tvl_usd) * cm * ca * 10 ** (gt + at + bt);
+  // Each tilt is published as the multiplier that enters the product, rounded
+  // once to 4 decimals, so the drawer's waterfall reproduces the headline to
+  // the dollar instead of re-rounding a log exponent behind the reader's back.
+  const tg = p4(10 ** (W_G * g));
+  const ta = p4(10 ** (ay === null ? 0 : W_A * lg(Math.max(0.08, ay))));
+  const tb = p4(10 ** (W_C * (lg(Math.max(1, p.chains.length)) - lg(2)) / lg(2)));
+  const raw = sig6(p.tvl_usd) * cm * ca * tg * ta * tb;
   const implied = Math.max(1, Math.min(100_000_000_000_000, Math.round(raw)));
-  return { p, implied, cm, ca, gt, at, bt, ay };
+  return { p, implied, cm, ca, tg, ta, tb, ay };
 });
 scored.sort((a, b) => (b.implied - a.implied) || (a.p.slug < b.p.slug ? -1 : 1));
 const rows: Row[] = scored.map((s, i) => {
@@ -386,8 +387,8 @@ const rows: Row[] = scored.map((s, i) => {
     slug: p.slug, name: p.name, rank: i + 1, implied_value_usd: s.implied,
     farm_steps: farmSteps(p), category: p.category, chains: p.chains, tvl_usd: p.tvl_usd,
     change_7d: p.change_7d, age_years: s.ay === null ? null : Math.round(s.ay * 100) / 100,
-    multiple_used: p6(s.cm * s.ca), curve_multiple: s.cm, category_adj: s.ca,
-    growth_tilt: s.gt, age_tilt: s.at, breadth_tilt: s.bt,
+    multiple_used: p5(s.cm * s.ca), curve_multiple: s.cm, category_adj: s.ca,
+    growth_mult: s.tg, age_mult: s.ta, breadth_mult: s.tb,
     implied_lo_usd: Math.max(1, Math.round(s.implied / rangeK)),
     implied_hi_usd: Math.round(s.implied * rangeK),
     slice_per_1k_usd: Math.round((s.implied * 0.1 * 1000 / p.tvl_usd) * 100) / 100,
@@ -404,6 +405,19 @@ const rows: Row[] = scored.map((s, i) => {
    reported in the run's summary instead. Rank and ordering are re-established
    by construction below, and every board row is validated by the scorer. */
 let repaired = 0;
+/* The headline must equal the product of the published factors, to the dollar.
+   By construction it does; if a future edit breaks that, repair it here rather
+   than ship a waterfall a reader can falsify with a calculator. */
+for (const r of rows) {
+  const prod = Math.max(1, Math.round(sig6(r.tvl_usd) * r.curve_multiple * r.category_adj * r.growth_mult * r.age_mult * r.breadth_mult));
+  if (prod !== r.implied_value_usd) {
+    r.implied_value_usd = prod;
+    r.implied_lo_usd = Math.max(1, Math.round(prod / rangeK));
+    r.implied_hi_usd = Math.round(prod * rangeK);
+    r.slice_per_1k_usd = Math.round((prod * 0.1 * 1000 / r.tvl_usd) * 100) / 100;
+    repaired++;
+  }
+}
 for (let i = 0; i < rows.length; i++) {
   if (rows[i]!.rank !== i + 1) { rows[i]!.rank = i + 1; repaired++; }
   if (i > 0 && rows[i]!.implied_value_usd > rows[i - 1]!.implied_value_usd) {
@@ -432,13 +446,12 @@ const catTable = [...catRow.entries()]
   .sort((a, b) => b[1] - a[1])
   .slice(0, 12);
 const r2 = (x: number): number => Math.round(x * 100) / 100;
-const sig = (x: number): number => Number(x.toPrecision(4));
+const sig = (x: number): number => Number(x.toPrecision(3));
 const flatMedianMultiple = 10 ** flatMedLog;
 const data = {
   m: {
     a: +intercept.toFixed(4), b: +slope.toFixed(4), n: nComp, sd: +residSd.toFixed(4),
     loo: +looMed.toFixed(2), flat: +flatMed.toFixed(2), rk: +rangeK.toFixed(2),
-    worst: worstName,
     asOf: snap.as_of, fl: snap.floor_usd, tot: protos.length, wl: snap.watchlist.length,
     ranked: rows.length, tok: nTokened, set: nSetAside, nomc: nNoMcap, bad: nBadMcap, catW: CAT_WEIGHT, scale: SCALE,
     tilt: { g: +TILT.g.toFixed(4), a: +TILT.a.toFixed(4), c: +TILT.c.toFixed(4),
@@ -451,20 +464,21 @@ const data = {
      category instead of one copy per row. */
   cadj: catNames.map((c) => +catMult(c).toFixed(4)),
   cats: catNames, chains: chainNames, catT: catTable,
+  fam: catNames.map((c) => FAMS.indexOf(familyOf(c))),
   // one setup template plus the capital bracket per family: six full copies of
   // the same sentence cost the dossier's text budget for no information
   T: { su: SETUP_T, cap: SETUP_CAP, mid: MID, safety: SAFETY },
   // nearest comparables are found again in the browser from this array
-  c: comps.map((p) => [p.name, sig(p.tvl_usd), sig(p.mcap_usd!)]),
-  // [0] is rank-1 (position), and index 9/10 are the TWO separate multiples
-  // the page multiplies out, so its waterfall reproduces the headline exactly
+  c: comps.map((p) => [p.name, sig(p.tvl_usd), Number((p.mcap_usd! / p.tvl_usd).toPrecision(4))]),
+  // [0] is rank-1 (position); 9 is the curve multiple (5 sig digits) and
+  // 10..12 the tilt multipliers (4 dp) -- exactly the numbers the page prints
   r: rows.map((r) => [
     r.slug, r.name, catNames.indexOf(r.category ?? 'Uncategorised'),
     chainNames.indexOf(r.farm_on), r.chains.length, sig6(r.tvl_usd),
     r.change_7d === null ? null : Math.round(r.change_7d * 10) / 10,
     r.age_years, r.implied_value_usd, r.curve_multiple,
-    r.growth_tilt, r.age_tilt, r.breadth_tilt,
-    r.tier === 'Watchlist' ? 1 : 0, FAMS.indexOf(familyOf(r.category)),
+    r.growth_mult, r.age_mult, r.breadth_mult,
+    r.tier === 'Watchlist' ? 1 : 0,
   ]),
 };
 
